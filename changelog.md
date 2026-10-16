@@ -1,3 +1,10 @@
+## 0.4.0
+
+- Date (UTC): 2026-10-16T08:53:43.459Z
+- Branch: `feature/add-telegram-notification`
+- PR: [#6](https://github.com/nightmarakesh/devops-pipeline/pull/6)
+- Changes: ci: notify Telegram after Docker Hub publication
+
 ## 0.3.0
 
 - Date (UTC): 2026-10-16T08:15:11.026Z
