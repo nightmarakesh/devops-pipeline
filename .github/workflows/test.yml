@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  unit:
+    name: Unit tests — stub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run unit test stub
+        run: echo "Unit test stub passed"
+
+  smoke:
+    name: Smoke tests — stub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run smoke test stub
+        run: echo "Smoke test stub passed"
+
+  label:
+    name: Add test-passed label
+    needs: [unit, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create and apply label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const name = "test-passed";
+
+            try {
+              await github.rest.issues.getLabel({
+                owner, repo, name
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name,
+                color: "0E8A16",
+                description: "All test jobs passed"
+              });
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: [name]
+            });
