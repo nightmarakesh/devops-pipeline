@@ -6,8 +6,12 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
 
 jobs:
   security:
@@ -25,3 +29,101 @@ jobs:
     name: Tests
     needs: security
     uses: ./.github/workflows/test.yml
+
+  version:
+    name: Update version
+    needs: tests
+    runs-on: ubuntu-latest
+
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      old_version: ${{ steps.bump.outputs.old_version }}
+      update_type: ${{ steps.bump.outputs.update_type }}
+
+    steps:
+      - name: Download main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Calculate and save version
+        id: bump
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const branch = context.payload.pull_request.head.ref;
+            const oldVersion = fs.readFileSync("version", "utf8").trim();
+
+            if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(oldVersion)) {
+              throw new Error("Invalid version file: " + oldVersion);
+            }
+
+            let [major, minor, patch] = oldVersion.split(".").map(Number);
+            let updateType;
+
+            if (branch.startsWith("feature/")) {
+              minor += 1;
+              patch = 0;
+              updateType = "minor";
+            } else if (branch.startsWith("hotfix/")) {
+              patch += 1;
+              updateType = "patch";
+            } else {
+              throw new Error("Unsupported branch: " + branch);
+            }
+
+            const newVersion = `${major}.${minor}.${patch}`;
+            fs.writeFileSync("version", newVersion + "\n");
+
+            core.setOutput("old_version", oldVersion);
+            core.setOutput("new_version", newVersion);
+            core.setOutput("update_type", updateType);
+
+            core.info(`${oldVersion} -> ${newVersion} (${updateType})`);
+
+      - name: Commit and push version
+        env:
+          OLD_VERSION: ${{ steps.bump.outputs.old_version }}
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+          UPDATE_TYPE: ${{ steps.bump.outputs.update_type }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add version
+          git commit -m "[$NEW_VERSION] <- [$OLD_VERSION] $UPDATE_TYPE up"
+          git push origin HEAD:main
+
+      - name: Add version label
+        uses: actions/github-script@v7
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const name = process.env.NEW_VERSION;
+
+            try {
+              await github.rest.issues.getLabel({
+                owner, repo, name
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name,
+                color: "1D76DB",
+                description: "Application version"
+              });
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: [name]
+            });
