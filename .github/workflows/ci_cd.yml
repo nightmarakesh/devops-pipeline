@@ -417,3 +417,11 @@ jobs:
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
 
           echo "Changelog document sent."
+
+  deploy:
+    name: Deploy
+    needs: [version, changelog, telegram]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      version: ${{ needs.version.outputs.new_version }}
+      release_sha: ${{ needs.changelog.outputs.release_sha }}

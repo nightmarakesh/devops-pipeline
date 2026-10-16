@@ -1,0 +1,143 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      release_sha:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy:
+    name: Deploy on local Windows
+    runs-on: [self-hosted, Windows, X64, devops-local]
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        shell: powershell
+
+    env:
+      IMAGE_REPOSITORY: nightmarakesh/devops-pipeline
+      IMAGE_TAG: v${{ inputs.version }}
+
+    steps:
+      - name: Download release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          persist-credentials: false
+
+      - name: Check Docker
+        run: |
+          docker info
+          if ($LASTEXITCODE -ne 0) {
+              throw "Docker Engine is unavailable."
+          }
+
+          docker compose version
+          if ($LASTEXITCODE -ne 0) {
+              throw "Docker Compose is unavailable."
+          }
+
+      - name: Pull published image
+        run: |
+          docker compose -p devops-pipeline pull app
+          if ($LASTEXITCODE -ne 0) {
+              throw "Failed to pull the published image."
+          }
+
+      - name: Deploy with Docker Compose
+        run: |
+          docker compose -p devops-pipeline up -d --no-build --pull never app
+          if ($LASTEXITCODE -ne 0) {
+              throw "Docker Compose deployment failed."
+          }
+
+      - name: Check deployed application
+        run: |
+          $ready = $false
+
+          for ($attempt = 1; $attempt -le 15; $attempt++) {
+              try {
+                  $response = Invoke-WebRequest `
+                      -Uri "http://127.0.0.1:18080" `
+                      -UseBasicParsing `
+                      -TimeoutSec 5
+
+                  if (
+                      $response.StatusCode -eq 200 -and
+                      $response.Content.Contains("Hello, DevOps!")
+                  ) {
+                      $ready = $true
+                      break
+                  }
+              }
+              catch {
+                  Write-Host "Application is not ready yet."
+              }
+
+              Start-Sleep -Seconds 2
+          }
+
+          if (-not $ready) {
+              docker compose -p devops-pipeline logs --tail 50 app
+              throw "Application availability check failed."
+          }
+
+          docker inspect devops-pipeline --format '{{.Config.Image}}'
+          if ($LASTEXITCODE -ne 0) {
+              throw "Failed to inspect the deployed container."
+          }
+
+          Write-Host "Application is available."
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker compose -p devops-pipeline ps
+          docker compose -p devops-pipeline logs --tail 50 app
+
+  label:
+    name: Add PROD label
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create and apply label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const name = "PROD";
+
+            try {
+              await github.rest.issues.getLabel({
+                owner, repo, name
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name,
+                color: "D93F0B",
+                description: "Application deployed and availability checked"
+              });
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: [name]
+            });

@@ -1,6 +1,6 @@
 services:
   app:
-    image: devops-pipeline:local
+    image: "${IMAGE_REPOSITORY:-devops-pipeline}:${IMAGE_TAG:-local}"
     container_name: devops-pipeline
     ports:
       - "127.0.0.1:18080:5000"
