@@ -58,37 +58,7 @@ http://localhost:18080
 
 https://hub.docker.com/r/nightmarakesh/devops-pipeline/tags
 
-## Проверка состояния
 
-```powershell
-docker compose -p devops-pipeline ps
-docker inspect devops-pipeline --format '{{.Config.Image}}'
-```
-
-## Просмотр логов
-
-```powershell
-docker compose -p devops-pipeline logs --tail 50 app
-```
-
-## Остановка и удаление контейнера
-
-```powershell
-docker compose -p devops-pipeline down
-```
-
-## Необязательная локальная сборка
-
-Для разработки можно собрать образ самостоятельно:
-
-```powershell
-docker build -t devops-pipeline:local .
-
-$env:IMAGE_REPOSITORY = "devops-pipeline"
-$env:IMAGE_TAG = "local"
-
-docker compose -p devops-pipeline up -d --no-build --pull never app
-```
 
 ## CI/CD
 
@@ -107,64 +77,3 @@ Pipeline запускается после merge ветки `feature/*` или `
 8. Локальный деплой через Docker Compose и проверка страницы.
 9. Создание Git-тега и GitHub Release.
 
-Тесты-заглушки используются в соответствии с условиями задания.
-
-## Правила версионирования
-
-- `feature/*`: увеличение minor и сброс patch в ноль.
-- `hotfix/*`: увеличение patch.
-
-Текущая версия хранится в файле `version`.
-
-Docker-теги и Git-теги имеют формат `vX.Y.Z`.
-
-Новые записи в `changelog.md` добавляются выше старых.
-
-## Метки PR
-
-- `sec-passed`
-- `test-passed`
-- номер версии
-- `changelog`
-- `dockerhub`
-- `PROD`
-
-## Секреты GitHub Actions
-
-Для воспроизведения pipeline необходимо настроить:
-
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-
-Значения секретов не хранятся в репозитории.
-
-В текущей учебной конфигурации адрес образа для локального деплоя
-задан в `.github/workflows/deploy.yml`:
-`nightmarakesh/devops-pipeline`.
-
-## Локальный runner
-
-Для автоматического деплоя нужен зарегистрированный Windows x64 runner
-с дополнительной меткой `devops-local`.
-
-Во время деплоя должны работать:
-
-- Docker Desktop;
-- runner;
-- сетевое подключение к GitHub.
-
-В текущем окружении runner использует локальный прокси:
-соответствующий VPN-клиент должен быть запущен.
-
-Runner выполняет доверенный код на локальном компьютере.
-Не следует запускать на нём непроверенные изменения.
-
-## Особенности учебной реализации
-
-- Merge следующих PR выполняется после завершения предыдущего pipeline.
-- Полный повтор workflow повторно увеличивает версию.
-- Для восстановления после ошибки сначала нужно проверить,
-  какие этапы уже выполнены.
-- `PROD` в этом проекте — локальный учебный стенд.
