@@ -1,3 +1,10 @@
+## 0.6.1
+
+- Date (UTC): 2026-10-16T10:01:26.620Z
+- Branch: `hotfix/fix-greeting-and-docs`
+- PR: [#9](https://github.com/nightmarakesh/devops-pipeline/pull/9)
+- Changes: fix: update greeting and published image instructions
+
 ## 0.6.0
 
 - Date (UTC): 2026-10-16T09:48:04.498Z
