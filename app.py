@@ -5,4 +5,4 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    return "Hello, DevOps!\n"
+    return "Hello, DevOps! Pipeline test.\n"
