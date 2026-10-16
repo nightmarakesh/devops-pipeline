@@ -1,0 +1,19 @@
+# Локальные переменные и секреты
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Локальные настройки редактора
+.vscode/
+
+# Результаты проверок
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
