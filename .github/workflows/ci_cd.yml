@@ -425,3 +425,61 @@ jobs:
     with:
       version: ${{ needs.version.outputs.new_version }}
       release_sha: ${{ needs.changelog.outputs.release_sha }}
+
+  release:
+    name: Create GitHub Release
+    needs: [version, changelog, deploy]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download changelog artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+          path: release-files
+
+      - name: Prepare release notes
+        env:
+          NEW_VERSION: ${{ needs.version.outputs.new_version }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ["NEW_VERSION"]
+          changelog = Path("release-files/changelog.md").read_text(
+              encoding="utf-8"
+          )
+
+          expected_heading = f"## {version}\n"
+
+          if not changelog.startswith(expected_heading):
+              raise ValueError("Changelog does not start with the release version")
+
+          latest_entry = changelog.split("\n## ", 1)[0].strip()
+
+          notes = (
+              "Minimal Python and Flask application demonstrating CI/CD.\n\n"
+              "Deployment completed and application availability checked.\n\n"
+              + latest_entry
+              + "\n"
+          )
+
+          Path("release-notes.md").write_text(notes, encoding="utf-8")
+          PY
+
+      - name: Create release and Git tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NEW_VERSION: ${{ needs.version.outputs.new_version }}
+          RELEASE_SHA: ${{ needs.changelog.outputs.release_sha }}
+        run: |
+          gh release create "v$NEW_VERSION" \
+            "release-files/changelog.md" \
+            --target "$RELEASE_SHA" \
+            --title "Release v$NEW_VERSION" \
+            --notes-file release-notes.md
