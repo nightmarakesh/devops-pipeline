@@ -10,8 +10,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  tests:
-    name: Tests
+  security:
+    name: Security
     if: >-
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -19,4 +19,9 @@ jobs:
         startsWith(github.event.pull_request.head.ref, 'feature/') ||
         startsWith(github.event.pull_request.head.ref, 'hotfix/')
       )
+    uses: ./.github/workflows/sec.yml
+
+  tests:
+    name: Tests
+    needs: security
     uses: ./.github/workflows/test.yml
