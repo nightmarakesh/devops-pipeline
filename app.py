@@ -4,5 +4,5 @@ app = Flask(__name__)
 
 
 @app.route("/")
-def index():
-    return "Hello, DevOps! Pipeline test.\n"
+def index():    
+    return "Hello, DevOps! Release pipeline is working.\n"
