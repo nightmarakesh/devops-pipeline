@@ -1,3 +1,10 @@
+## 0.6.0
+
+- Date (UTC): 2026-10-16T09:48:04.498Z
+- Branch: `feature/add-github-release`
+- PR: [#8](https://github.com/nightmarakesh/devops-pipeline/pull/8)
+- Changes: ci: create GitHub release after deployment
+
 ## 0.5.0
 
 - Date (UTC): 2026-10-16T09:35:43.376Z
