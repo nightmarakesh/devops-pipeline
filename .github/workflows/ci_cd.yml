@@ -127,3 +127,98 @@ jobs:
               issue_number,
               labels: [name]
             });
+            
+  changelog:
+    name: Update changelog
+    needs: version
+    runs-on: ubuntu-latest
+
+    outputs:
+      release_sha: ${{ steps.commit.outputs.release_sha }}
+
+    steps:
+      - name: Download main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Prepend release entry
+        uses: actions/github-script@v7
+        env:
+          NEW_VERSION: ${{ needs.version.outputs.new_version }}
+        with:
+          script: |
+            const fs = require("fs");
+            const version = process.env.NEW_VERSION;
+            const pr = context.payload.pull_request;
+            const date = new Date().toISOString();
+
+            const previous = fs.existsSync("changelog.md")
+              ? fs.readFileSync("changelog.md", "utf8")
+              : "";
+
+            const entry = [
+              `## ${version}`,
+              "",
+              `- Date (UTC): ${date}`,
+              `- Branch: \`${pr.head.ref}\``,
+              `- PR: [#${pr.number}](${pr.html_url})`,
+              `- Changes: ${pr.title}`,
+              "",
+              ""
+            ].join("\n");
+
+            fs.writeFileSync("changelog.md", entry + previous);
+
+      - name: Commit and push changelog
+        id: commit
+        env:
+          NEW_VERSION: ${{ needs.version.outputs.new_version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add changelog.md
+          git commit -m "docs: update changelog for $NEW_VERSION"
+          git push origin HEAD:main
+
+          echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Add changelog label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const name = "changelog";
+
+            try {
+              await github.rest.issues.getLabel({
+                owner, repo, name
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name,
+                color: "5319E7",
+                description: "Release changelog updated"
+              });
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: [name]
+            });
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: changelog.md
+          if-no-files-found: error
+          retention-days: 30
