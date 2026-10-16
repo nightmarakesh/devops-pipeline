@@ -311,3 +311,109 @@ jobs:
               issue_number,
               labels: [name]
             });
+
+  telegram:
+    name: Notify Telegram
+    needs: [version, changelog, dockerhub]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download changelog artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+          path: release-files
+
+      - name: Prepare release message
+        env:
+          NEW_VERSION: ${{ needs.version.outputs.new_version }}
+          RELEASE_SHA: ${{ needs.changelog.outputs.release_sha }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          python - <<'PY'
+          import html
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as file:
+              event = json.load(file)
+
+          pr = event["pull_request"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          project = repository.split("/", 1)[1]
+          version = os.environ["NEW_VERSION"]
+          owner = os.environ["DOCKERHUB_USERNAME"]
+          sha = os.environ["RELEASE_SHA"]
+          server = os.environ["GITHUB_SERVER_URL"]
+
+          repo_url = f"{server}/{repository}"
+          image = f"{owner}/{project}:v{version}"
+          docker_url = f"https://hub.docker.com/r/{owner}/{project}"
+          tags_url = f"{docker_url}/tags?name=v{version}"
+          commit_url = f"{repo_url}/commit/{sha}"
+          run_url = f"{repo_url}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+          def escape(value):
+              return html.escape(str(value), quote=True)
+
+          def link(url, text):
+              return f'<a href="{escape(url)}">{escape(text)}</a>'
+
+          message = "\n".join([
+              "Новый выпуск приложения",
+              f"Проект: {link(repo_url, project)}",
+              f"Версия: {escape(version)}",
+              f"Дата: {date}",
+              f"Автор PR: {link(pr['user']['html_url'], pr['user']['login'])}",
+              "",
+              "Информация о Git-репозитории",
+              f"PR: {link(pr['html_url'], '#' + str(pr['number']))}",
+              f"Ветка: {escape(pr['head']['ref'])}",
+              f"Коммит выпуска: {link(commit_url, sha[:7])}",
+              f"Pipeline: {link(run_url, 'Открыть запуск')}",
+              "",
+              "Информация о Docker-репозитории",
+              f"Владелец: {escape(owner)}",
+              f"Название: {link(docker_url, project)}",
+              f"Тег: {link(tags_url, 'v' + version)}",
+              f"Полное имя: {escape(image)}"
+          ])
+
+          Path("telegram-message.txt").write_text(message, encoding="utf-8")
+          PY
+
+      - name: Send release message
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl --silent --show-error --fail \
+            --connect-timeout 15 \
+            --max-time 60 \
+            --output /tmp/telegram-message-response.json \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "parse_mode=HTML" \
+            --data-urlencode "text@telegram-message.txt" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+
+          echo "Release message sent."
+
+      - name: Send changelog document
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NEW_VERSION: ${{ needs.version.outputs.new_version }}
+        run: |
+          curl --silent --show-error --fail \
+            --connect-timeout 15 \
+            --max-time 60 \
+            --output /tmp/telegram-document-response.json \
+            --form-string "chat_id=$TELEGRAM_CHAT_ID" \
+            --form-string "caption=Changelog for v$NEW_VERSION" \
+            --form "document=@release-files/changelog.md" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument"
+
+          echo "Changelog document sent."
