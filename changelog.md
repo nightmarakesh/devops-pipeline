@@ -1,3 +1,10 @@
+## 0.3.0
+
+- Date (UTC): 2026-10-16T08:15:11.026Z
+- Branch: `feature/add-dockerhub-publish`
+- PR: [#5](https://github.com/nightmarakesh/devops-pipeline/pull/5)
+- Changes: ci: publish versioned image and update Docker Hub
+
 ## 0.2.0
 
 - Date (UTC): 2026-10-16T02:43:47.012Z
