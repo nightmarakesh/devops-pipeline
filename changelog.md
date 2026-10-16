@@ -1,3 +1,10 @@
+## 0.5.0
+
+- Date (UTC): 2026-10-16T09:35:43.376Z
+- Branch: `feature/add-local-deploy`
+- PR: [#7](https://github.com/nightmarakesh/devops-pipeline/pull/7)
+- Changes: ci: deploy published image on local Windows runner
+
 ## 0.4.0
 
 - Date (UTC): 2026-10-16T08:53:43.459Z
