@@ -1,0 +1,1 @@
+Minimal Python and Flask application demonstrating a GitHub Actions CI/CD pipeline.
